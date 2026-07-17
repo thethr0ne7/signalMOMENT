@@ -1,0 +1,55 @@
+:root {
+  color-scheme: dark;
+
+  /* Brand */
+  --color-bg-canvas: #000000;
+  --color-bg-surface: #020304;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: rgba(255,255,255,.59);
+  --color-text-muted: rgba(255,255,255,.39);
+  --color-accent-primary: #2fe6a6;
+  --color-accent-secondary: #8b5cff;
+  --color-accent-tertiary: #55f6ff;
+  --color-danger: #ff3131;
+
+  /* Surfaces */
+  --color-glass: rgba(255,255,255,.055);
+  --color-glass-strong: rgba(255,255,255,.08);
+  --color-line: rgba(255,255,255,.13);
+  --color-focus: #55f6ff;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Radius */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* Elevation */
+  --shadow-surface: inset 0 1px 0 rgba(255,255,255,.08), 0 14px 34px rgba(0,0,0,.18);
+  --shadow-action: inset 0 1px 0 rgba(255,255,255,.58), inset 0 -8px 18px rgba(0,80,50,.16), 0 17px 46px rgba(47,230,166,.24), 0 0 32px rgba(47,230,166,.13);
+
+  /* Motion */
+  --motion-fast: 160ms;
+  --motion-standard: 280ms;
+  --motion-slow: 580ms;
+  --ease-standard: cubic-bezier(.2,.8,.2,1);
+  --ease-emphasized: cubic-bezier(.2,.9,.25,1);
+
+  /* Compatibility aliases. New UI should prefer semantic tokens above. */
+  --mint: var(--color-accent-primary);
+  --violet: var(--color-accent-secondary);
+  --cyan: var(--color-accent-tertiary);
+  --danger: var(--color-danger);
+  --glass: var(--color-glass);
+  --glass-line: var(--color-line);
+}
