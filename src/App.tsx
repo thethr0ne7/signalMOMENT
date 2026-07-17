@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { GameResult, Screen } from './app/app.types'
 import { SignalGame } from './features/game/SignalGame'
 import { signalApi } from './shared/api/client'
+import type { GameSession } from './shared/api/client'
 import { loadBestScore, loadHistory, saveResult } from './shared/storage/localResults'
 import { telegramAdapter } from './shared/telegram/telegramAdapter'
 
@@ -13,24 +14,41 @@ export default function App() {
   const [best, setBest] = useState(loadBestScore)
   const [history, setHistory] = useState<GameResult[]>(loadHistory)
   const [chainId, setChainId] = useState('local')
+  const [shareToken, setShareToken] = useState('local')
   const [inviter, setInviter] = useState('сети')
+  const gameSessionRef = useRef<GameSession | null>(null)
+  const gameStartedAtRef = useRef(0)
 
   const player = useMemo(() => telegramAdapter.getPlayerName(), [])
   const startParam = useMemo(() => telegramAdapter.getStartParam(), [])
 
   useEffect(() => {
     telegramAdapter.init()
-    void signalApi.resolveChain(startParam).then((chain) => {
+    const bootstrap = async () => {
+      try {
+        await signalApi.authenticate(telegramAdapter.getInitData())
+      } catch (error) {
+        console.warn('Verified Telegram session unavailable; using local fallback.', error)
+      }
+
+      const chain = await signalApi.resolveChain(startParam)
       setChainId(chain.chainId)
+      setShareToken(chain.shareToken)
       setInviter(chain.inviterLabel)
-    })
+    }
+    void bootstrap()
   }, [startParam])
 
   const start = useCallback(() => {
     telegramAdapter.haptic('tap')
     setCountdown(3)
     setScreen('countdown')
-  }, [])
+    gameStartedAtRef.current = Date.now()
+    gameSessionRef.current = null
+    void signalApi.startGameSession(chainId)
+      .then((gameSession) => { gameSessionRef.current = gameSession })
+      .catch((error) => console.warn('Server game session unavailable; result remains local.', error))
+  }, [chainId])
 
   useEffect(() => {
     if (screen !== 'countdown') return
@@ -48,7 +66,9 @@ export default function App() {
     const saved = saveResult(next, history, best)
     setHistory(saved.history)
     setBest(saved.best)
-    void signalApi.saveResult(chainId, next)
+    const clientDurationMs = Math.max(0, Date.now() - gameStartedAtRef.current)
+    void signalApi.saveResult(gameSessionRef.current, chainId, next, clientDurationMs)
+      .catch((error) => console.warn('Server result persistence failed; local result is preserved.', error))
     telegramAdapter.haptic(next.success ? 'success' : 'error')
     setScreen('result')
   }, [best, chainId, history])
@@ -100,7 +120,7 @@ export default function App() {
             <Stat label="ЛУЧШИЙ" value={`${best.toFixed(2)} с`} />
             <Stat label="ПОПЫТОК" value={String(history.length)} />
           </div>
-          <button className="primary" onClick={() => telegramAdapter.shareSignal(result.score, result.accuracy, chainId)}>ЛОВИ СИГНАЛ →</button>
+          <button className="primary" onClick={() => telegramAdapter.shareSignal(result.score, result.accuracy, shareToken)}>ЛОВИ СИГНАЛ →</button>
           <button className="ghost" onClick={start}>ЕЩЁ РАЗ</button>
           <button className="text-btn" onClick={() => setScreen('home')}>На главный экран</button>
         </section>
