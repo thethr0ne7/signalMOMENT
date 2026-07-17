@@ -17,6 +17,27 @@
 .game-meta-row em { font-style: normal; color: var(--cyan); font-variant-numeric: tabular-nums; }
 .game-meta-row .combo-live { color: var(--mint); text-shadow: 0 0 14px rgba(47,230,166,.7); animation: comboPulse .75s ease-in-out infinite alternate; }
 
+.event-beat {
+  margin-top: 10px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.025);
+  color: rgba(255,255,255,.36);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .16em;
+  text-align: center;
+  transition: border-color .25s ease, color .25s ease, box-shadow .25s ease, transform .25s ease;
+}
+.event-beat:not(.beat-ожидание) { transform: translateY(-1px); }
+.beat-резонанс { color: var(--mint); border-color: rgba(47,230,166,.38); box-shadow: 0 0 24px rgba(47,230,166,.11); }
+.beat-электромагнитная-буря { color: var(--cyan); border-color: rgba(85,246,255,.35); box-shadow: 0 0 28px rgba(85,246,255,.12); animation: stormSignal .55s ease-in-out infinite alternate; }
+.beat-перегрузка { color: #fff; border-color: rgba(139,92,255,.56); box-shadow: 0 0 34px rgba(139,92,255,.22); animation: overloadSignal .7s ease-in-out infinite alternate; }
+
 .duel-verdict {
   display: flex;
   justify-content: space-between;
@@ -56,4 +77,18 @@
 @keyframes comboPulse {
   from { transform: scale(.98); opacity: .78; }
   to { transform: scale(1.04); opacity: 1; }
+}
+@keyframes stormSignal {
+  from { opacity: .72; transform: translateX(-1px); }
+  to { opacity: 1; transform: translateX(1px); }
+}
+@keyframes overloadSignal {
+  from { transform: scale(.985); opacity: .82; }
+  to { transform: scale(1.015); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .beat-электромагнитная-буря,
+  .beat-перегрузка,
+  .game-meta-row .combo-live { animation: none; }
 }
