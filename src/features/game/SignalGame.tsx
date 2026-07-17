@@ -3,23 +3,40 @@ import type { GameResult } from '../../app/app.types'
 import { telegramAdapter } from '../../shared/telegram/telegramAdapter'
 import { calculateGameResult, GAME_SECONDS } from './scoring'
 
-type Particle = {
-  angle: number
-  distance: number
-  speed: number
-  size: number
-  phase: number
-}
-
-type TrailPoint = {
-  x: number
-  y: number
-  life: number
-}
+type Particle = { angle: number; distance: number; speed: number; size: number; phase: number }
+type TrailPoint = { x: number; y: number; life: number }
+type Phase = 'ЗАХВАТ' | 'СПОКОЙНО' | 'УСКОРЕНИЕ' | 'ЛОЖНЫЙ МАНЁВР' | 'РЫВОК' | 'ВОССТАНОВЛЕНИЕ'
 
 const TOUCH_OFFSET_Y = 46
+const LOSS_GRACE_MS = 320
 
-function stabilityLabel(integrity: number, inside: boolean) {
+function comboTier(streakMs: number) {
+  if (streakMs >= 12_000) return 4
+  if (streakMs >= 8_000) return 3
+  if (streakMs >= 5_000) return 2
+  if (streakMs >= 2_000) return 1
+  return 0
+}
+
+function movementPhase(elapsedMs: number): Phase {
+  if (elapsedMs < 2_500) return 'СПОКОЙНО'
+  if (elapsedMs < 5_500) return 'УСКОРЕНИЕ'
+  if (elapsedMs < 8_500) return 'ЛОЖНЫЙ МАНЁВР'
+  if (elapsedMs < 12_000) return 'РЫВОК'
+  return 'ВОССТАНОВЛЕНИЕ'
+}
+
+function phaseMotion(phase: Phase) {
+  if (phase === 'УСКОРЕНИЕ') return { speed: 1.32, amp: 1.08, jitter: 1 }
+  if (phase === 'ЛОЖНЫЙ МАНЁВР') return { speed: 1.08, amp: 1.16, jitter: 1.6 }
+  if (phase === 'РЫВОК') return { speed: 1.62, amp: 1.2, jitter: 2.1 }
+  if (phase === 'ВОССТАНОВЛЕНИЕ') return { speed: 0.82, amp: 0.88, jitter: 0.45 }
+  return { speed: 0.82, amp: 0.82, jitter: 0.35 }
+}
+
+function statusLabel(started: boolean, integrity: number, inside: boolean, grace: boolean) {
+  if (!started) return 'ПОЙМАЙ СИГНАЛ — ТАЙМЕР ЖДЁТ'
+  if (grace && !inside) return 'ВОССТАНОВИ КОНТАКТ'
   if (integrity <= 25) return 'КРИТИЧЕСКИЙ РАЗРЫВ'
   if (integrity <= 55) return 'СИГНАЛ НЕСТАБИЛЕН'
   if (inside) return 'КОНТАКТ ЗАФИКСИРОВАН'
@@ -32,6 +49,11 @@ export function SignalGame({ onFinish }: { onFinish: (result: GameResult) => voi
   const [integrity, setIntegrity] = useState(100)
   const [active, setActive] = useState(false)
   const [locked, setLocked] = useState(false)
+  const [started, setStarted] = useState(false)
+  const [phase, setPhase] = useState<Phase>('ЗАХВАТ')
+  const [combo, setCombo] = useState(0)
+  const [streakSeconds, setStreakSeconds] = useState(0)
+  const [inGrace, setInGrace] = useState(false)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -49,10 +71,16 @@ export function SignalGame({ onFinish }: { onFinish: (result: GameResult) => voi
     }))
 
     let raf = 0
-    const start = performance.now()
-    let last = start
+    const mountedAt = performance.now()
+    let last = mountedAt
+    let gameStartedAt = 0
+    let firstLockAt = 0
     let elapsedInside = 0
     let totalActive = 0
+    let currentStreak = 0
+    let longestStreak = 0
+    let lastInsideAt = 0
+    let recoveries = 0
     let pointer = { x: -9999, y: -9999, down: false }
     let integrityValue = 100
     let done = false
@@ -81,7 +109,6 @@ export function SignalGame({ onFinish }: { onFinish: (result: GameResult) => voi
       setActive(true)
       telegramAdapter.haptic('tap')
     }
-
     const move = (event: PointerEvent) => updatePointer(event)
     const up = () => {
       pointer.down = false
@@ -92,192 +119,158 @@ export function SignalGame({ onFinish }: { onFinish: (result: GameResult) => voi
     const finish = (success: boolean) => {
       if (done) return
       done = true
-      onFinish(calculateGameResult(elapsedInside, totalActive, success))
+      const base = calculateGameResult(elapsedInside, totalActive, success)
+      const result: GameResult = {
+        ...base,
+        longestStreakMs: longestStreak,
+        reactionTimeMs: firstLockAt ? firstLockAt - mountedAt : undefined,
+        comboTier: comboTier(longestStreak),
+        recoveries,
+      }
+      onFinish(result)
     }
 
     const drawOrbit = (x: number, y: number, radius: number, rotation: number, alpha: number, color: string) => {
-      ctx.save()
-      ctx.translate(x, y)
-      ctx.rotate(rotation)
-      ctx.strokeStyle = color
-      ctx.globalAlpha = alpha
-      ctx.lineWidth = 1.4
+      ctx.save(); ctx.translate(x, y); ctx.rotate(rotation)
+      ctx.strokeStyle = color; ctx.globalAlpha = alpha; ctx.lineWidth = 1.4
       ctx.setLineDash([radius * 0.34, radius * 0.13])
-      ctx.beginPath()
-      ctx.arc(0, 0, radius, -Math.PI * 0.72, Math.PI * 0.56)
-      ctx.stroke()
-      ctx.restore()
+      ctx.beginPath(); ctx.arc(0, 0, radius, -Math.PI * 0.72, Math.PI * 0.56); ctx.stroke(); ctx.restore()
     }
 
     const draw = (now: number) => {
       const dt = Math.min(40, now - last)
       last = now
-      const elapsed = now - start
+      const gameElapsed = gameStartedAt ? now - gameStartedAt : 0
+      const currentPhase = gameStartedAt ? movementPhase(gameElapsed) : 'ЗАХВАТ'
+      const motionConfig = phaseMotion(currentPhase)
       const rect = canvas.getBoundingClientRect()
       const w = rect.width
       const h = rect.height
-      const t = elapsed / 1000
+      const t = gameElapsed / 1000
       const motion = reducedMotion ? 0.35 : 1
       const radius = Math.max(34, Math.min(50, Math.min(w, h) * 0.102))
       const edgeX = radius * 2.7
       const edgeTop = radius * 2.7
       const edgeBottom = radius * 2.7 + TOUCH_OFFSET_Y
-      const rawX = w / 2 + Math.sin(t * 1.12 * motion) * w * 0.2 + Math.sin(t * 3.05 * motion) * 13
-      const rawY = h / 2 - 18 + Math.cos(t * 1.01 * motion) * h * 0.16 + Math.cos(t * 2.4 * motion) * 11
+      const feint = currentPhase === 'ЛОЖНЫЙ МАНЁВР' ? Math.sin(t * 7.5) * 18 : 0
+      const surge = currentPhase === 'РЫВОК' ? Math.sin(t * 11) * 15 : 0
+      const rawX = w / 2 + Math.sin(t * 1.12 * motionConfig.speed * motion) * w * 0.2 * motionConfig.amp + Math.sin(t * 3.05 * motion) * 13 * motionConfig.jitter + feint
+      const rawY = h / 2 - 18 + Math.cos(t * 1.01 * motionConfig.speed * motion) * h * 0.16 * motionConfig.amp + Math.cos(t * 2.4 * motion) * 11 * motionConfig.jitter + surge
       const coreX = Math.min(w - edgeX, Math.max(edgeX, rawX))
       const coreY = Math.min(h - edgeBottom, Math.max(edgeTop, rawY))
       const anchorX = coreX
       const anchorY = coreY + TOUCH_OFFSET_Y
-      const captureRadius = Math.max(50, radius * 1.25)
-      const distance = Math.hypot(pointer.x - anchorX, pointer.y - anchorY)
-      const inside = pointer.down && distance <= captureRadius
+      const captureRadius = Math.max(52, radius * 1.3)
+      const inside = pointer.down && Math.hypot(pointer.x - anchorX, pointer.y - anchorY) <= captureRadius
+      const withinLossGrace = gameStartedAt > 0 && !inside && now - lastInsideAt <= LOSS_GRACE_MS
       const danger = Math.max(0, 1 - integrityValue / 100)
-      const pulse = 1 + Math.sin(t * 3.6) * 0.045
+      const pulse = 1 + Math.sin(now / 280) * 0.045
 
-      if (pointer.down) totalActive += dt
-      if (inside) {
-        elapsedInside += dt
-        integrityValue = Math.min(100, integrityValue + dt * 0.02)
-      } else {
-        integrityValue -= dt * (pointer.down ? 0.042 : 0.065)
+      if (inside && !gameStartedAt) {
+        gameStartedAt = now
+        firstLockAt = now
+        setStarted(true)
+        telegramAdapter.haptic('success')
+      }
+
+      if (gameStartedAt) {
+        if (pointer.down) totalActive += dt
+        if (inside) {
+          if (!previousInside && lastInsideAt > 0 && now - lastInsideAt > LOSS_GRACE_MS) recoveries += 1
+          lastInsideAt = now
+          elapsedInside += dt
+          currentStreak += dt
+          longestStreak = Math.max(longestStreak, currentStreak)
+          integrityValue = Math.min(100, integrityValue + dt * 0.022)
+        } else if (withinLossGrace) {
+          currentStreak += dt * 0.35
+          integrityValue = Math.max(0, integrityValue - dt * 0.006)
+        } else {
+          currentStreak = 0
+          integrityValue -= dt * (pointer.down ? 0.04 : 0.06)
+        }
       }
 
       if (inside !== previousInside) {
         setLocked(inside)
-        if (inside) telegramAdapter.haptic('tap')
+        if (inside && gameStartedAt) telegramAdapter.haptic('tap')
         previousInside = inside
       }
 
       if (now - lastUiUpdate > 45) {
         setIntegrity(Math.max(0, integrityValue))
-        setTimeLeft(Math.max(0, GAME_SECONDS - elapsed / 1000))
+        setTimeLeft(gameStartedAt ? Math.max(0, GAME_SECONDS - gameElapsed / 1000) : GAME_SECONDS)
+        setPhase(currentPhase)
+        setCombo(comboTier(currentStreak))
+        setStreakSeconds(currentStreak / 1000)
+        setInGrace(withinLossGrace)
         lastUiUpdate = now
       }
 
       trail.unshift({ x: coreX, y: coreY, life: 1 })
-      if (trail.length > 20) trail.pop()
-      trail.forEach((point) => { point.life -= 0.052 })
-
+      if (trail.length > 22) trail.pop()
+      trail.forEach((point) => { point.life -= 0.05 })
       ctx.clearRect(0, 0, w, h)
 
       trail.forEach((point, index) => {
-        const alpha = Math.max(0, point.life) * (inside ? 0.13 : 0.09)
+        const alpha = Math.max(0, point.life) * (inside ? 0.14 : 0.09)
         ctx.fillStyle = inside ? `rgba(47,230,166,${alpha})` : `rgba(139,92,255,${alpha})`
-        ctx.beginPath()
-        ctx.arc(point.x, point.y, Math.max(2, radius * 0.56 - index * 1.05), 0, Math.PI * 2)
-        ctx.fill()
+        ctx.beginPath(); ctx.arc(point.x, point.y, Math.max(2, radius * 0.58 - index), 0, Math.PI * 2); ctx.fill()
       })
 
       const field = ctx.createRadialGradient(coreX, coreY, radius * 0.1, coreX, coreY, radius * 4.8)
-      field.addColorStop(0, inside ? 'rgba(47,230,166,.26)' : 'rgba(139,92,255,.22)')
+      field.addColorStop(0, inside ? 'rgba(47,230,166,.27)' : 'rgba(139,92,255,.22)')
       field.addColorStop(0.45, danger > 0.52 ? 'rgba(255,49,49,.1)' : 'rgba(85,246,255,.04)')
       field.addColorStop(1, 'rgba(0,0,0,0)')
-      ctx.fillStyle = field
-      ctx.fillRect(0, 0, w, h)
+      ctx.fillStyle = field; ctx.fillRect(0, 0, w, h)
 
       particles.forEach((particle, index) => {
         const orbit = radius * particle.distance * (1 + Math.sin(t * 0.8 + particle.phase) * 0.08)
-        const angle = particle.angle + t * particle.speed * (inside ? 1.4 : 0.72)
+        const angle = particle.angle + t * particle.speed * (inside ? 1.4 + comboTier(currentStreak) * 0.16 : 0.72)
         const px = coreX + Math.cos(angle) * orbit
         const py = coreY + Math.sin(angle) * orbit * 0.72
         const alpha = 0.15 + Math.sin(t * 2 + particle.phase) * 0.12 + (inside ? 0.17 : 0)
-        ctx.fillStyle = danger > 0.62 && index % 3 === 0
-          ? `rgba(255,78,78,${Math.max(0.05, alpha)})`
-          : `rgba(85,246,255,${Math.max(0.04, alpha)})`
-        ctx.beginPath()
-        ctx.arc(px, py, particle.size * (danger > 0.6 ? 1.3 : 1), 0, Math.PI * 2)
-        ctx.fill()
+        ctx.fillStyle = danger > 0.62 && index % 3 === 0 ? `rgba(255,78,78,${Math.max(0.05, alpha)})` : `rgba(85,246,255,${Math.max(0.04, alpha)})`
+        ctx.beginPath(); ctx.arc(px, py, particle.size, 0, Math.PI * 2); ctx.fill()
       })
 
       drawOrbit(coreX, coreY, radius * 1.48, t * 0.5, 0.54, inside ? '#2FE6A6' : '#8B5CFF')
       drawOrbit(coreX, coreY, radius * 1.86, -t * 0.32, 0.3, '#55F6FF')
       drawOrbit(coreX, coreY, radius * 2.35, t * 0.18, 0.15 + danger * 0.28, danger > 0.55 ? '#FF3131' : '#FFFFFF')
 
-      const expandingPulse = radius * (1.35 + ((t * 0.75) % 1) * 1.25)
-      ctx.strokeStyle = inside ? 'rgba(47,230,166,.28)' : 'rgba(139,92,255,.22)'
-      ctx.lineWidth = 1.2
-      ctx.beginPath()
-      ctx.arc(coreX, coreY, expandingPulse, 0, Math.PI * 2)
-      ctx.stroke()
-
       if (pointer.down) {
-        ctx.strokeStyle = inside ? 'rgba(47,230,166,.48)' : 'rgba(255,95,95,.4)'
-        ctx.lineWidth = 1.5
-        ctx.setLineDash([5, 7])
-        ctx.beginPath()
-        ctx.moveTo(coreX, coreY + radius * 0.75)
-        ctx.quadraticCurveTo(coreX, anchorY - 14, pointer.x, pointer.y)
-        ctx.stroke()
-        ctx.setLineDash([])
+        ctx.strokeStyle = inside ? 'rgba(47,230,166,.5)' : 'rgba(255,95,95,.4)'
+        ctx.setLineDash([5, 7]); ctx.beginPath(); ctx.moveTo(coreX, coreY + radius * 0.75); ctx.quadraticCurveTo(coreX, anchorY - 14, pointer.x, pointer.y); ctx.stroke(); ctx.setLineDash([])
       }
 
-      ctx.strokeStyle = inside ? 'rgba(47,230,166,.82)' : 'rgba(255,255,255,.24)'
-      ctx.lineWidth = inside ? 2.2 : 1.2
-      ctx.beginPath()
-      ctx.arc(anchorX, anchorY, captureRadius + Math.sin(t * 5) * 2, 0, Math.PI * 2)
-      ctx.stroke()
-      ctx.beginPath()
-      ctx.arc(anchorX, anchorY, 9, 0, Math.PI * 2)
-      ctx.stroke()
+      ctx.strokeStyle = inside || withinLossGrace ? 'rgba(47,230,166,.86)' : 'rgba(255,255,255,.25)'
+      ctx.lineWidth = inside ? 2.4 : 1.2
+      ctx.beginPath(); ctx.arc(anchorX, anchorY, captureRadius + Math.sin(t * 5) * 2, 0, Math.PI * 2); ctx.stroke()
 
-      const glow = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, radius * 2.55)
+      const glow = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, radius * 2.6)
       glow.addColorStop(0, 'rgba(255,255,255,.98)')
       glow.addColorStop(0.12, inside ? 'rgba(47,230,166,.96)' : 'rgba(139,92,255,.92)')
       glow.addColorStop(0.48, danger > 0.58 ? 'rgba(255,49,49,.25)' : 'rgba(85,246,255,.18)')
       glow.addColorStop(1, 'rgba(0,0,0,0)')
-      ctx.fillStyle = glow
-      ctx.beginPath()
-      ctx.arc(coreX, coreY, radius * 2.55 * pulse, 0, Math.PI * 2)
-      ctx.fill()
-
-      ctx.save()
-      ctx.translate(coreX, coreY)
-      ctx.rotate(t * 0.4)
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(coreX, coreY, radius * 2.6 * pulse, 0, Math.PI * 2); ctx.fill()
       ctx.strokeStyle = inside ? '#2FE6A6' : danger > 0.55 ? '#FF5151' : '#8B5CFF'
-      ctx.lineWidth = inside ? 3.3 : 2.4
-      ctx.shadowColor = ctx.strokeStyle
-      ctx.shadowBlur = inside ? 24 : 15
-      ctx.beginPath()
-      ctx.arc(0, 0, radius * pulse, 0, Math.PI * 2)
-      ctx.stroke()
-      ctx.restore()
-
-      ctx.fillStyle = '#FFFFFF'
-      ctx.shadowColor = inside ? '#2FE6A6' : '#8B5CFF'
-      ctx.shadowBlur = 26
-      ctx.beginPath()
-      ctx.arc(coreX, coreY, Math.max(7, radius * 0.16), 0, Math.PI * 2)
-      ctx.fill()
-      ctx.shadowBlur = 0
-
-      if (pointer.down) {
-        ctx.strokeStyle = inside ? 'rgba(47,230,166,.95)' : 'rgba(255,49,49,.9)'
-        ctx.lineWidth = 2
-        ctx.beginPath()
-        ctx.arc(pointer.x, pointer.y, 20 + Math.sin(t * 6) * 2, 0, Math.PI * 2)
-        ctx.stroke()
-      }
+      ctx.lineWidth = inside ? 3.3 : 2.4; ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = inside ? 24 : 15
+      ctx.beginPath(); ctx.arc(coreX, coreY, radius * pulse, 0, Math.PI * 2); ctx.stroke(); ctx.shadowBlur = 0
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(coreX, coreY, Math.max(7, radius * 0.16), 0, Math.PI * 2); ctx.fill()
 
       if (integrityValue <= 0) return finish(false)
-      if (elapsed >= GAME_SECONDS * 1000) return finish(true)
+      if (gameStartedAt && gameElapsed >= GAME_SECONDS * 1000) return finish(true)
       raf = requestAnimationFrame(draw)
     }
 
-    resize()
-    addEventListener('resize', resize)
-    canvas.addEventListener('pointerdown', down)
-    canvas.addEventListener('pointermove', move)
-    canvas.addEventListener('pointerup', up)
-    canvas.addEventListener('pointercancel', up)
+    resize(); addEventListener('resize', resize)
+    canvas.addEventListener('pointerdown', down); canvas.addEventListener('pointermove', move)
+    canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up)
     raf = requestAnimationFrame(draw)
-
     return () => {
-      cancelAnimationFrame(raf)
-      removeEventListener('resize', resize)
-      canvas.removeEventListener('pointerdown', down)
-      canvas.removeEventListener('pointermove', move)
-      canvas.removeEventListener('pointerup', up)
-      canvas.removeEventListener('pointercancel', up)
+      cancelAnimationFrame(raf); removeEventListener('resize', resize)
+      canvas.removeEventListener('pointerdown', down); canvas.removeEventListener('pointermove', move)
+      canvas.removeEventListener('pointerup', up); canvas.removeEventListener('pointercancel', up)
     }
   }, [onFinish])
 
@@ -288,26 +281,13 @@ export function SignalGame({ onFinish }: { onFinish: (result: GameResult) => voi
         <div className="hud-center" aria-hidden="true"><i className={locked ? 'is-locked' : ''} /></div>
         <div className="hud-cell hud-cell-right"><span>STABILITY</span><strong>{Math.round(integrity)}</strong><small>%</small></div>
       </div>
-
-      <div className="game-status" aria-live="polite">
-        <span className={locked ? 'status-dot is-locked' : 'status-dot'} />
-        {stabilityLabel(integrity, locked)}
-      </div>
-
+      <div className="game-meta-row"><span>{phase}</span><strong className={combo ? 'combo-live' : ''}>{combo ? `COMBO x${combo}` : 'BUILD COMBO'}</strong><em>{streakSeconds.toFixed(1)}с</em></div>
+      <div className="game-status" aria-live="polite"><span className={locked ? 'status-dot is-locked' : 'status-dot'} />{statusLabel(started, integrity, locked, inGrace)}</div>
       <div className="canvas-wrap">
         <canvas ref={canvasRef} />
-        {!active && (
-          <div className="touch-hint">
-            <strong>ПОСТАВЬ ПАЛЕЦ ПОД ЯДРО</strong>
-            <span>Следуй за большим кольцом — сам сигнал останется видимым</span>
-          </div>
-        )}
+        {!active && !started && <div className="touch-hint"><strong>ПОЙМАЙ СИГНАЛ</strong><span>Таймер запустится только после первого точного контакта</span></div>}
       </div>
-
-      <div className="stability-panel">
-        <div className="stability-meta"><span>SIGNAL STABILITY</span><strong>{Math.round(integrity)}%</strong></div>
-        <div className="integrity"><i style={{ width: `${integrity}%` }} /><b style={{ left: `${integrity}%` }} /></div>
-      </div>
+      <div className="stability-panel"><div className="stability-meta"><span>SIGNAL STABILITY</span><strong>{Math.round(integrity)}%</strong></div><div className="integrity"><i style={{ width: `${integrity}%` }} /><b style={{ left: `${integrity}%` }} /></div></div>
     </section>
   )
 }
