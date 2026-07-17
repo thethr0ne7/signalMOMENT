@@ -13,6 +13,47 @@ export type GameSession = {
   seed: number
 }
 
+export type ChainParticipant = {
+  userId: string
+  firstName: string
+  username: string | null
+  depth: number
+  bestResult: number | null
+  joinedAt: string
+  isCurrentUser: boolean
+  isInviter: boolean
+}
+
+export type ChainResult = {
+  userId: string
+  firstName: string
+  score: number
+  accuracy: number
+  success: boolean
+  createdAt: string
+}
+
+export type ChainSnapshot = {
+  id: string
+  status: 'active' | 'expired' | 'completed'
+  participantCount: number
+  bestResult: number
+  maxDepth: number
+  expiresAt: string
+  inviter: ChainParticipant | null
+  participants: ChainParticipant[]
+  results: ChainResult[]
+}
+
+export type ActivityEvent = {
+  id: number
+  eventType: string
+  chainId: string | null
+  actorName: string
+  createdAt: string
+  payload: Record<string, unknown>
+}
+
 type AuthSession = {
   access_token: string
   expires_at?: number
@@ -21,6 +62,8 @@ type AuthSession = {
 export interface SignalApi {
   authenticate(initData: string): Promise<boolean>
   resolveChain(startParam: string): Promise<ChainContext>
+  getChain(chainId: string): Promise<ChainSnapshot | null>
+  getActivity(): Promise<ActivityEvent[]>
   startGameSession(chainId: string): Promise<GameSession | null>
   saveResult(session: GameSession | null, chainId: string, result: GameResult, clientDurationMs: number): Promise<void>
 }
@@ -46,6 +89,10 @@ function createLocalChainId() {
 
 function inviterToken(startParam: string) {
   return startParam.startsWith('chain_') ? startParam.slice('chain_'.length) : null
+}
+
+function hasServerSession() {
+  return Boolean(apiUrl && session?.access_token)
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -85,7 +132,7 @@ export const signalApi: SignalApi = {
 
   async resolveChain(startParam) {
     const token = inviterToken(startParam)
-    if (apiUrl && session?.access_token) {
+    if (hasServerSession()) {
       const { chain } = await request<{ chain: { id: string; share_token: string } }>('/chains', {
         method: 'POST',
         body: JSON.stringify({ inviterToken: token }),
@@ -97,8 +144,20 @@ export const signalApi: SignalApi = {
     return { chainId: localId, shareToken: localId, inviterLabel: token ? 'друга' : 'сети' }
   },
 
+  async getChain(chainId) {
+    if (!hasServerSession()) return null
+    const { chain } = await request<{ chain: ChainSnapshot }>(`/chains/${chainId}`)
+    return chain
+  },
+
+  async getActivity() {
+    if (!hasServerSession()) return []
+    const { events } = await request<{ events: ActivityEvent[] }>('/users/me/activity')
+    return events
+  },
+
   async startGameSession(chainId) {
-    if (!apiUrl || !session?.access_token) return null
+    if (!hasServerSession()) return null
     const { session: gameSession } = await request<{ session: GameSession }>('/game-sessions', {
       method: 'POST',
       body: JSON.stringify({ chainId }),
@@ -107,7 +166,7 @@ export const signalApi: SignalApi = {
   },
 
   async saveResult(gameSession, _chainId, result, clientDurationMs) {
-    if (!gameSession || !apiUrl || !session?.access_token) return
+    if (!gameSession || !hasServerSession()) return
     await request(`/game-sessions/${gameSession.id}/results`, {
       method: 'POST',
       body: JSON.stringify({
