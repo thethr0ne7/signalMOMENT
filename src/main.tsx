@@ -4,6 +4,7 @@ import './design-tokens.css'
 import './styles.css'
 import './chain.css'
 import './gameplay-depth.css'
+import './brand-redesign.css'
 import './accessibility.css'
 import App from './App'
 

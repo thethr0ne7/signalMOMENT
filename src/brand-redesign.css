@@ -1,0 +1,206 @@
+/* Lime Signal Artifact — visual layer only. Gameplay behavior stays untouched. */
+
+html, body, #root { background: var(--bg); }
+body { color: var(--white); }
+
+.app-shell {
+  background:
+    radial-gradient(circle at 50% 28%, rgba(216,255,47,.055), transparent 24%),
+    radial-gradient(circle at 78% 76%, rgba(110,90,207,.08), transparent 26%),
+    linear-gradient(180deg, #050505 0%, #000 56%, #050505 100%);
+}
+
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent 49.8%, rgba(216,255,47,.045) 50%, transparent 50.2%),
+    linear-gradient(transparent 49.8%, rgba(255,255,255,.024) 50%, transparent 50.2%);
+  background-size: 100% 140px, 140px 100%;
+  mask-image: radial-gradient(circle at 50% 48%, #000 0 24%, transparent 72%);
+  animation: artifactGrid 16s linear infinite;
+}
+
+.app-shell::after {
+  background: radial-gradient(circle at 50% 46%, transparent 25%, rgba(0,0,0,.5) 68%, #000 100%);
+}
+
+.ambient { filter: blur(92px); animation-duration: 12s; }
+.ambient-mint { background: var(--accent); opacity: .13; }
+.ambient-violet { background: var(--purple); opacity: .1; }
+.ambient-cyan { background: var(--info); opacity: .035; }
+.grid { opacity: .045; background-size: 52px 52px; }
+.noise { opacity: .07; mix-blend-mode: soft-light; }
+
+.topbar {
+  height: 72px;
+  padding-inline: 18px;
+  border-bottom: 1px solid rgba(255,255,255,.055);
+  background: linear-gradient(180deg, rgba(0,0,0,.9), rgba(0,0,0,.2));
+  backdrop-filter: blur(18px);
+}
+
+.brand-mark i { background: var(--accent); box-shadow: 0 0 10px var(--accent), 0 0 28px var(--glow-lime-strong); }
+.brand-mark b { border-color: rgba(216,255,47,.7); }
+.brand { letter-spacing: .2em; }
+.brand-sub { color: var(--disabled); }
+
+.icon-btn {
+  border-color: var(--border);
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 14px 34px rgba(0,0,0,.4);
+}
+.icon-btn:active { border-color: rgba(216,255,47,.45); }
+
+.screen { padding-inline: 18px; }
+.eyebrow { color: var(--accent); }
+h1, h2 { font-weight: 900; letter-spacing: -.06em; text-wrap: balance; }
+.lead, .muted { color: var(--text-secondary); }
+
+.home-screen::before,
+.result-screen::before,
+.countdown-screen::before {
+  content: "SIGNAL / LIVE";
+  position: absolute;
+  top: 7px;
+  right: 18px;
+  color: rgba(216,255,47,.42);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .2em;
+}
+
+.signal-orb {
+  width: min(54vw, 232px);
+  margin-block: 30px 28px;
+  animation: artifactFloat 4.2s var(--ease-standard) infinite;
+}
+.signal-orb::before {
+  inset: -60%;
+  background:
+    radial-gradient(circle, rgba(216,255,47,.2) 0 8%, rgba(216,255,47,.08) 22%, rgba(110,90,207,.05) 42%, transparent 68%);
+  animation: artifactBreathe 2.4s ease-in-out infinite;
+}
+.signal-orb::after {
+  content: "";
+  position: absolute;
+  inset: 26%;
+  border-radius: 50%;
+  border: 1px solid rgba(216,255,47,.5);
+  box-shadow: 0 0 32px var(--glow-lime-strong), inset 0 0 26px var(--glow-lime-soft);
+  animation: coreScan 2.6s ease-in-out infinite;
+}
+.signal-orb > span {
+  width: 31%;
+  background: radial-gradient(circle at 36% 31%, #fff 0 7%, #efffb2 13%, var(--accent) 31%, rgba(216,255,47,.35) 58%, transparent 74%);
+  box-shadow: 0 0 22px rgba(255,255,255,.5), 0 0 70px var(--glow-lime-strong), 0 0 140px var(--glow-lime-soft);
+}
+.ring-one { border-color: rgba(216,255,47,.8); }
+.ring-two { border-color: rgba(255,255,255,.18); border-left-color: transparent; border-right-color: transparent; }
+.ring-three { border-color: rgba(110,90,207,.2); border-top-color: rgba(110,90,207,.8); }
+
+.stat,
+.challenge-card,
+.chain-summary,
+.activity-feed,
+.skill-card,
+.duel-verdict,
+.game-meta-row {
+  border-color: var(--color-line-soft);
+  background: linear-gradient(155deg, rgba(26,26,26,.96), rgba(12,12,12,.96));
+  box-shadow: var(--shadow-surface);
+  backdrop-filter: blur(18px);
+}
+
+.stat { border-radius: 16px; }
+.stat::before { background: linear-gradient(115deg, transparent 40%, rgba(216,255,47,.055), transparent 64%); }
+.stat > i { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+.stat span, .skill-card span, .chain-summary span { color: var(--disabled); }
+
+.challenge-card { border-radius: 18px; }
+.challenge-card::before { background: var(--glow-purple); opacity: .75; }
+.challenge-card__head i { color: var(--accent); }
+.challenge-card__accuracy b { color: var(--accent); text-shadow: 0 0 18px var(--glow-lime-strong); }
+
+.primary, .ghost { border-radius: 16px; min-height: 58px; }
+.primary {
+  color: #0A0A0A;
+  border-color: rgba(255,255,255,.18);
+  background: linear-gradient(135deg, #F2FF9A 0%, var(--accent) 43%, #B7D900 100%);
+  box-shadow: var(--shadow-action);
+}
+.primary::before { border-radius: 14px; border-color: rgba(255,255,255,.25); }
+.primary::after { background: rgba(255,255,255,.32); }
+.primary:hover { filter: brightness(1.04); }
+.ghost {
+  color: var(--white);
+  border-color: var(--border);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+}
+.ghost:hover { background: var(--color-bg-surface-hover); border-color: rgba(216,255,47,.22); }
+.text-btn { color: var(--text-secondary); }
+
+.countdown-radar {
+  border-color: rgba(216,255,47,.2);
+  background: repeating-radial-gradient(circle, transparent 0 24px, rgba(216,255,47,.06) 25px 26px);
+  box-shadow: 0 0 100px var(--glow-lime-soft);
+}
+.countdown-radar::after { border-color: rgba(216,255,47,.35); }
+.countdown { text-shadow: 0 0 18px #fff, 0 0 64px var(--glow-lime-strong); }
+
+.game-screen.is-warning { background: radial-gradient(circle at 50% 55%, rgba(255,200,87,.08), transparent 58%); }
+.game-screen.is-critical { background: radial-gradient(circle at 50% 55%, rgba(255,77,79,.14), transparent 62%); }
+.game-meta-row em { color: var(--info); }
+.game-meta-row .combo-live { color: var(--accent); text-shadow: 0 0 16px var(--glow-lime-strong); }
+.event-beat { background: rgba(18,18,18,.9); border-color: var(--border); }
+.beat-резонанс { color: var(--accent); border-color: rgba(216,255,47,.4); box-shadow: 0 0 28px var(--glow-lime-soft); }
+.beat-электромагнитная-буря { color: var(--info); border-color: rgba(78,161,255,.36); box-shadow: 0 0 28px rgba(78,161,255,.12); }
+.beat-перегрузка { color: #fff; border-color: rgba(110,90,207,.58); box-shadow: 0 0 34px var(--glow-purple); }
+
+.duel-verdict.is-win { border-color: rgba(216,255,47,.45); box-shadow: 0 0 30px var(--glow-lime-soft); }
+.duel-verdict.is-win strong { color: var(--accent); }
+.duel-verdict.is-loss { border-color: rgba(255,77,79,.42); }
+.duel-verdict.is-loss strong { color: var(--error); }
+
+.result-score { color: var(--white); text-shadow: 0 0 38px rgba(216,255,47,.08); }
+.status-badge.success { color: var(--accent); }
+.accuracy-ring { filter: drop-shadow(0 0 22px var(--glow-lime-soft)); }
+.activity-dot { background: var(--purple); box-shadow: 0 0 12px var(--glow-purple); }
+.activity-chain_joined, .activity-result_recorded { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+
+.history-item { background: linear-gradient(155deg, var(--surface-2), var(--surface)); border-color: var(--border); }
+.history-item em { color: var(--accent); }
+
+@keyframes artifactGrid {
+  from { transform: translateY(0); }
+  to { transform: translateY(140px); }
+}
+@keyframes artifactFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-8px) scale(1.015); }
+}
+@keyframes artifactBreathe {
+  0%, 100% { opacity: .62; transform: scale(.96); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+@keyframes coreScan {
+  0%, 100% { transform: scale(.82); opacity: .28; }
+  50% { transform: scale(1.2); opacity: .9; }
+}
+
+@media (max-height: 760px) {
+  .signal-orb { width: min(43vw, 182px); margin-block: 16px; }
+  h1 { font-size: clamp(38px, 10.5vw, 58px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell::before,
+  .signal-orb,
+  .signal-orb::before,
+  .signal-orb::after { animation: none !important; }
+}

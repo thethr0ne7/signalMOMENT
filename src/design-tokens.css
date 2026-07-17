@@ -1,22 +1,34 @@
 :root {
   color-scheme: dark;
 
-  /* Brand */
+  /* Brand palette */
   --color-bg-canvas: #000000;
-  --color-bg-surface: #020304;
-  --color-text-primary: #ffffff;
-  --color-text-secondary: rgba(255,255,255,.59);
-  --color-text-muted: rgba(255,255,255,.39);
-  --color-accent-primary: #2fe6a6;
-  --color-accent-secondary: #8b5cff;
-  --color-accent-tertiary: #55f6ff;
-  --color-danger: #ff3131;
+  --color-bg-surface: #121212;
+  --color-bg-surface-2: #1A1A1A;
+  --color-bg-surface-hover: #1F1F1F;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #A9A9A9;
+  --color-text-muted: #666666;
+  --color-accent-primary: #D8FF2F;
+  --color-accent-secondary: #6E5ACF;
+  --color-accent-tertiary: #4EA1FF;
+  --color-danger: #FF4D4F;
+  --color-warning: #FFC857;
+  --color-info: #4EA1FF;
+  --color-success: #D8FF2F;
 
-  /* Surfaces */
-  --color-glass: rgba(255,255,255,.055);
+  /* Surfaces and lines */
+  --color-glass: rgba(255,255,255,.05);
   --color-glass-strong: rgba(255,255,255,.08);
-  --color-line: rgba(255,255,255,.13);
-  --color-focus: #55f6ff;
+  --color-line: #2A2A2A;
+  --color-line-soft: rgba(255,255,255,.08);
+  --color-focus: #D8FF2F;
+  --color-disabled: #666666;
+
+  /* Glow */
+  --glow-lime-strong: rgba(216,255,47,.28);
+  --glow-lime-soft: rgba(216,255,47,.12);
+  --glow-purple: rgba(110,90,207,.22);
 
   /* Spacing */
   --space-1: 4px;
@@ -35,8 +47,8 @@
   --radius-pill: 999px;
 
   /* Elevation */
-  --shadow-surface: inset 0 1px 0 rgba(255,255,255,.08), 0 14px 34px rgba(0,0,0,.18);
-  --shadow-action: inset 0 1px 0 rgba(255,255,255,.58), inset 0 -8px 18px rgba(0,80,50,.16), 0 17px 46px rgba(47,230,166,.24), 0 0 32px rgba(47,230,166,.13);
+  --shadow-surface: inset 0 1px 0 rgba(255,255,255,.055), 0 20px 48px rgba(0,0,0,.34);
+  --shadow-action: inset 0 1px 0 rgba(255,255,255,.28), inset 0 -8px 20px rgba(70,86,0,.16), 0 18px 48px var(--glow-lime-strong), 0 0 34px var(--glow-lime-soft);
 
   /* Motion */
   --motion-fast: 160ms;
@@ -45,11 +57,25 @@
   --ease-standard: cubic-bezier(.2,.8,.2,1);
   --ease-emphasized: cubic-bezier(.2,.9,.25,1);
 
-  /* Compatibility aliases. New UI should prefer semantic tokens above. */
+  /* Product-facing aliases */
+  --bg: #000000;
+  --surface: #121212;
+  --surface-2: #1A1A1A;
+  --accent: #D8FF2F;
+  --white: #FFFFFF;
+  --text-secondary: #A9A9A9;
+  --disabled: #666666;
+  --border: #2A2A2A;
+  --purple: #6E5ACF;
+  --error: #FF4D4F;
+  --warning: #FFC857;
+  --info: #4EA1FF;
+
+  /* Compatibility aliases for existing feature styles */
   --mint: var(--color-accent-primary);
   --violet: var(--color-accent-secondary);
-  --cyan: var(--color-accent-tertiary);
+  --cyan: var(--color-info);
   --danger: var(--color-danger);
   --glass: var(--color-glass);
-  --glass-line: var(--color-line);
+  --glass-line: var(--color-line-soft);
 }
