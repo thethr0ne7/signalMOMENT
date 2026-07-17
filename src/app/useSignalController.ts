@@ -2,8 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { GameResult, Screen } from './app.types'
 import { signalApi } from '../shared/api/client'
 import type { ActivityEvent, ChainSnapshot, GameSession } from '../shared/api/client'
+import { trackProductEvent } from '../shared/analytics/productAnalytics'
 import { loadBestScore, loadHistory, saveResult } from '../shared/storage/localResults'
 import { telegramAdapter } from '../shared/telegram/telegramAdapter'
+
+function hashSeed(value: string) {
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
+}
 
 export function useSignalController() {
   const [screen, setScreen] = useState<Screen>('home')
@@ -16,6 +26,7 @@ export function useSignalController() {
   const [inviter, setInviter] = useState('сети')
   const [chain, setChain] = useState<ChainSnapshot | null>(null)
   const [activity, setActivity] = useState<ActivityEvent[]>([])
+  const [gameSeed, setGameSeed] = useState(hashSeed('local'))
   const gameSessionRef = useRef<GameSession | null>(null)
   const gameStartedAtRef = useRef(0)
 
@@ -37,6 +48,7 @@ export function useSignalController() {
 
   useEffect(() => {
     telegramAdapter.init()
+    trackProductEvent('app_opened', { inviterPresent: Boolean(startParam) })
     const bootstrap = async () => {
       try {
         await signalApi.authenticate(telegramAdapter.getInitData())
@@ -48,6 +60,11 @@ export function useSignalController() {
       setChainId(resolvedChain.chainId)
       setShareToken(resolvedChain.shareToken)
       setInviter(resolvedChain.inviterLabel)
+      setGameSeed(hashSeed(resolvedChain.chainId))
+      trackProductEvent('challenge_viewed', {
+        chainId: resolvedChain.chainId,
+        inviterPresent: Boolean(startParam),
+      })
       await refreshSocialState(resolvedChain.chainId)
     }
     void bootstrap()
@@ -59,10 +76,16 @@ export function useSignalController() {
     setScreen('countdown')
     gameStartedAtRef.current = Date.now()
     gameSessionRef.current = null
+    trackProductEvent('game_started', {
+      chainId,
+      seed: gameSeed,
+      attemptNumber: history.length + 1,
+      inviterPresent: Boolean(startParam),
+    })
     void signalApi.startGameSession(chainId)
       .then((gameSession) => { gameSessionRef.current = gameSession })
       .catch((error) => console.warn('Server game session unavailable; result remains local.', error))
-  }, [chainId, history.length])
+  }, [chainId, gameSeed, history.length, startParam])
 
   useEffect(() => {
     if (screen !== 'countdown') return
@@ -81,20 +104,34 @@ export function useSignalController() {
     setHistory(saved.history)
     setBest(saved.best)
     const clientDurationMs = Math.max(0, Date.now() - gameStartedAtRef.current)
-    void signalApi.saveResult(gameSessionRef.current, chainId, next, clientDurationMs)
-      .then(() => refreshSocialState(chainId))
-      .catch((error) => console.warn('Server result persistence failed; local result is preserved.', error))
+    if (!next.interrupted) {
+      void signalApi.saveResult(gameSessionRef.current, chainId, next, clientDurationMs)
+        .then(() => refreshSocialState(chainId))
+        .catch((error) => console.warn('Server result persistence failed; local result is preserved.', error))
+    }
+    trackProductEvent('game_finished', {
+      chainId,
+      seed: next.seed ?? gameSeed,
+      pattern: next.pattern,
+      success: next.success,
+      interrupted: Boolean(next.interrupted),
+      score: next.score,
+      skillScore: next.skillScore,
+      failurePhase: next.failurePhase,
+      assistedTimeMs: next.assistedTimeMs,
+    })
     telegramAdapter.haptic(next.success ? 'success' : 'error')
     setScreen('result')
-  }, [best, chainId, history, refreshSocialState])
+  }, [best, chainId, gameSeed, history, refreshSocialState])
 
   const share = useCallback(() => {
     if (!result) return
+    trackProductEvent('share_clicked', { chainId, score: result.score, seed: result.seed ?? gameSeed })
     telegramAdapter.shareSignal(result.score, result.accuracy, shareToken)
-  }, [result, shareToken])
+  }, [chainId, gameSeed, result, shareToken])
 
   return {
     screen, setScreen, countdown, result, best, history, inviter, player,
-    chain, activity, start, finish, share,
+    chain, activity, gameSeed, start, finish, share,
   }
 }

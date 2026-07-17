@@ -9,6 +9,13 @@ export default function SignalAppView() {
     ? app.chain.results.filter((item) => item.userId === app.chain?.inviter?.userId).sort((a, b) => b.score - a.score)[0]
     : null
   const duelDelta = app.result && inviterResult ? app.result.score - inviterResult.score : null
+  const resultInsight = app.result?.interrupted
+    ? 'Попытка прервана и не отправлена в рейтинг.'
+    : app.result?.failurePhase
+      ? `Контакт потерян на фазе «${app.result.failurePhase}».`
+      : app.result?.centerAccuracy != null
+        ? `Точность по центру: ${app.result.centerAccuracy}%.`
+        : ''
 
   return (
     <main className={`app-shell screen-${app.screen}`}>
@@ -21,27 +28,27 @@ export default function SignalAppView() {
 
       {app.screen === 'home' && (
         <section className="screen home-screen screen-enter">
-          <div className="eyebrow"><i /> ВХОДЯЩИЙ ИМПУЛЬС</div>
-          <h1>Сигнал передан<br />от {app.inviter}</h1>
-          <p className="lead">Поймай ядро, удерживай контакт и переживи смену фаз. Таймер начнётся только после первого точного захвата.</p>
+          <div className="eyebrow"><i /> ОДИН МАРШРУТ · ЧЕСТНАЯ ДУЭЛЬ</div>
+          <h1>{inviterResult ? `${inviterResult.firstName}: ${inviterResult.score.toFixed(2)} сек` : 'Удержи сигнал 15 секунд'}</h1>
+          <p className="lead">Ты и друг проходите один и тот же маршрут. Побеждает не удача, а точность.</p>
           <IncomingChallenge chain={app.chain} />
           <div className="signal-orb" aria-hidden="true"><i className="orb-ring ring-one" /><i className="orb-ring ring-two" /><i className="orb-ring ring-three" /><span><b /></span></div>
           <ChainSummary chain={app.chain} />
-          <div className="stats-row"><Stat label="ЛИЧНЫЙ РЕКОРД" value={`${app.best.toFixed(2)} с`} /><Stat label="ОПЕРАТОР" value={app.player} /></div>
-          <button className="primary energy-button" onClick={app.start}><span>✦</span> ПРИНЯТЬ СИГНАЛ</button>
+          <div className="stats-row"><Stat label="ЛИЧНЫЙ РЕКОРД" value={`${app.best.toFixed(2)} с`} /><Stat label="МАРШРУТ" value={`#${app.gameSeed.toString(16).slice(0, 6).toUpperCase()}`} /></div>
+          <button className="primary energy-button" onClick={app.start}><span>✦</span> {inviterResult ? 'ПРИНЯТЬ ВЫЗОВ' : 'НАЧАТЬ'}</button>
           <button className="ghost" onClick={() => app.setScreen('history')}>ЦЕПЬ И РЕЗУЛЬТАТЫ</button>
         </section>
       )}
 
       {app.screen === 'countdown' && (
         <section className="screen centered countdown-screen screen-enter">
-          <div className="eyebrow"><i /> {app.history.length ? 'БЫСТРЫЙ ПОВТОР' : 'СИНХРОНИЗАЦИЯ'}</div>
+          <div className="eyebrow"><i /> {app.history.length ? 'БЫСТРЫЙ РЕВАНШ' : 'СИНХРОНИЗАЦИЯ'}</div>
           <div className="countdown-shell"><div className="countdown-radar" /><div className="countdown" key={app.countdown}>{app.countdown || 'GO'}</div></div>
-          <p className="muted">Следуй за нижним кольцом. Ядро останется над пальцем.</p>
+          <p className="muted">Следуй за нижним кольцом. Таймер стартует после захвата.</p>
         </section>
       )}
 
-      {app.screen === 'game' && <SignalGame onFinish={app.finish} />}
+      {app.screen === 'game' && <SignalGame seed={app.gameSeed} onFinish={app.finish} />}
 
       {app.screen === 'result' && app.result && (
         <section className="screen result-screen screen-enter">
@@ -49,21 +56,11 @@ export default function SignalAppView() {
           {duelDelta !== null && <div className={`duel-verdict ${duelDelta >= 0 ? 'is-win' : 'is-loss'}`}><span>{duelDelta >= 0 ? 'ТЫ ПОБЕДИЛ В ДУЭЛИ' : 'ДО ПОБЕДЫ НЕ ХВАТИЛО'}</span><strong>{Math.abs(duelDelta).toFixed(2)} сек</strong></div>}
           <div className="result-label">ВРЕМЯ КОНТАКТА</div>
           <div className="result-score">{app.result.score.toFixed(2)}<small> сек</small></div>
-          <div className="result-core">
-            <div className="accuracy-ring" style={{ '--p': `${app.result.accuracy * 3.6}deg` } as CSSProperties}><div><strong>{Math.round(app.result.accuracy)}%</strong><span>STABILITY</span></div></div>
-            <i className="result-orbit orbit-a" /><i className="result-orbit orbit-b" />
-          </div>
-          <div className="skill-grid">
-            <Skill label="ЛУЧШАЯ СЕРИЯ" value={`${((app.result.longestStreakMs ?? 0) / 1000).toFixed(1)}с`} />
-            <Skill label="РЕАКЦИЯ" value={app.result.reactionTimeMs ? `${(app.result.reactionTimeMs / 1000).toFixed(2)}с` : '—'} />
-            <Skill label="COMBO" value={`x${app.result.comboTier ?? 0}`} />
-            <Skill label="ВОЗВРАТЫ" value={String(app.result.recoveries ?? 0)} />
-          </div>
-          <div className="result-stability"><div><span>SIGNAL STABILITY</span><strong>{Math.round(app.result.accuracy)}%</strong></div><div className="result-track"><i style={{ width: `${app.result.accuracy}%` }} /></div></div>
-          <ChainSummary chain={app.chain} />
-          <div className="stats-row"><Stat label="ЛУЧШИЙ" value={`${app.best.toFixed(2)} с`} /><Stat label="ПОПЫТОК" value={String(app.history.length)} /></div>
-          <button className="primary energy-button" onClick={app.start}><span>↻</span> БЫСТРЫЙ РЕВАНШ</button>
-          <button className="ghost" onClick={app.share}><span>↗</span> ПЕРЕДАТЬ СИГНАЛ</button>
+          <p className="lead">{resultInsight}</p>
+          <div className="result-core"><div className="accuracy-ring" style={{ '--p': `${(app.result.skillScore ?? app.result.accuracy) * 3.6}deg` } as CSSProperties}><div><strong>{Math.round(app.result.skillScore ?? app.result.accuracy)}</strong><span>SKILL</span></div></div><i className="result-orbit orbit-a" /><i className="result-orbit orbit-b" /></div>
+          <div className="skill-grid"><Skill label="ТОЧНОСТЬ ЦЕНТРА" value={`${Math.round(app.result.centerAccuracy ?? app.result.accuracy)}%`} /><Skill label="ЛУЧШАЯ СЕРИЯ" value={`${((app.result.longestStreakMs ?? 0) / 1000).toFixed(1)}с`} /><Skill label="МАРШРУТ" value={app.result.pattern ?? '—'} /><Skill label="ПОМОЩЬ" value={`${((app.result.assistedTimeMs ?? 0) / 1000).toFixed(1)}с`} /></div>
+          <button className="primary energy-button" onClick={app.start}><span>↻</span> ПЕРЕИГРАТЬ ЭТОТ СИГНАЛ</button>
+          <button className="ghost" onClick={app.share}><span>↗</span> ОТПРАВИТЬ ВЫЗОВ</button>
           <button className="text-btn" onClick={() => app.setScreen('home')}>На главный экран</button>
         </section>
       )}
@@ -72,7 +69,7 @@ export default function SignalAppView() {
         <section className="screen leaderboard-screen screen-enter">
           <div className="eyebrow"><i /> ПРОТОКОЛ ЦЕПИ</div><h2>Цепь и контакты</h2>
           <ChainSummary chain={app.chain} /><ActivityFeed events={app.activity} />
-          {app.history.length === 0 ? <p className="muted">Здесь появятся результаты после первой игры.</p> : <div className="history-list">{app.history.map((item, index) => <div className="history-item" key={`${item.createdAt}-${index}`}><span>#{String(index + 1).padStart(2, '0')}</span><div><strong>{item.score.toFixed(2)} с</strong><small>{item.success ? `COMBO x${item.comboTier ?? 0}` : 'КОНТАКТ ПОТЕРЯН'}</small></div><em>{Math.round(item.accuracy)}%</em></div>)}</div>}
+          {app.history.length === 0 ? <p className="muted">Здесь появятся результаты после первой игры.</p> : <div className="history-list">{app.history.map((item, index) => <div className="history-item" key={`${item.createdAt}-${index}`}><span>#{String(index + 1).padStart(2, '0')}</span><div><strong>{item.score.toFixed(2)} с</strong><small>{item.pattern ?? (item.success ? `COMBO x${item.comboTier ?? 0}` : 'КОНТАКТ ПОТЕРЯН')}</small></div><em>{Math.round(item.skillScore ?? item.accuracy)}</em></div>)}</div>}
           <button className="primary energy-button" onClick={app.start}><span>✦</span> НОВЫЙ КОНТАКТ</button><button className="ghost" onClick={() => app.setScreen('home')}>НАЗАД</button>
         </section>
       )}
