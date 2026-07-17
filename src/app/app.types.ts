@@ -5,4 +5,8 @@ export type GameResult = {
   accuracy: number
   success: boolean
   createdAt: number
+  longestStreakMs?: number
+  reactionTimeMs?: number
+  comboTier?: number
+  recoveries?: number
 }
