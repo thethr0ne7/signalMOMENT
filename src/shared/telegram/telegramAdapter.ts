@@ -4,6 +4,7 @@ declare global {
       WebApp?: {
         ready: () => void
         expand: () => void
+        initData?: string
         HapticFeedback?: {
           impactOccurred: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void
           notificationOccurred: (type: 'error' | 'success' | 'warning') => void
@@ -32,6 +33,10 @@ export const telegramAdapter = {
     else webApp.HapticFeedback.notificationOccurred(type)
   },
 
+  getInitData() {
+    return webApp?.initData || ''
+  },
+
   getPlayerName() {
     return webApp?.initDataUnsafe?.user?.first_name
       || localStorage.getItem('signal_player_name')
@@ -44,10 +49,10 @@ export const telegramAdapter = {
       || 'solo'
   },
 
-  shareSignal(score: number, accuracy: number, chainId: string) {
+  shareSignal(score: number, accuracy: number, shareToken: string) {
     const bot = import.meta.env.VITE_TELEGRAM_BOT || 'your_bot'
     const app = import.meta.env.VITE_TELEGRAM_APP || 'app'
-    const deepLink = `https://t.me/${bot}/${app}?startapp=chain_${chainId}`
+    const deepLink = `https://t.me/${bot}/${app}?startapp=chain_${shareToken}`
     const text = `Я поймал сигнал: ${score.toFixed(2)} сек, точность ${Math.round(accuracy)}%. Продолжи цепь и побей мой результат.`
     const url = `https://t.me/share/url?url=${encodeURIComponent(deepLink)}&text=${encodeURIComponent(text)}`
 
