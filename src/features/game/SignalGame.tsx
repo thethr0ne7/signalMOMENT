@@ -9,6 +9,8 @@ type Point = { x: number; y: number; life: number }
 
 const GRACE_MS = 360
 const HUD_MS = 100
+const LIME = '#D8FF2F'
+const PURPLE = '#6E5ACF'
 
 function patternFor(seed: number): GamePattern {
   return (['ORBIT', 'ZIGZAG', 'FAKEOUT'] as GamePattern[])[seed % 3]
@@ -159,15 +161,69 @@ export function SignalGame({ seed, onFinish }: { seed: number; onFinish: (result
       if (now - lastUi > HUD_MS) { setTimeLeft(startedAt ? Math.max(0, GAME_SECONDS - elapsed / 1000) : GAME_SECONDS); setIntegrity(Math.max(0, integrityValue)); setCombo(comboFor(streak)); lastUi = now }
 
       trail.unshift({ x: coreX, y: coreY, life: 1 })
-      if (trail.length > 18) trail.pop()
+      if (trail.length > 28) trail.pop()
       ctx.clearRect(0, 0, width, height)
-      trail.forEach((point, index) => { point.life -= 0.06; ctx.fillStyle = inside ? `rgba(47,230,166,${Math.max(0, point.life) * 0.12})` : `rgba(139,92,255,${Math.max(0, point.life) * 0.08})`; ctx.beginPath(); ctx.arc(point.x, point.y, Math.max(2, radius * 0.55 - index), 0, Math.PI * 2); ctx.fill() })
-      ctx.strokeStyle = inside || inGrace ? '#2FE6A6' : '#8B5CFF'
-      ctx.lineWidth = inside ? 3 : 1.5
-      ctx.beginPath(); ctx.arc(coreX, anchorY, captureRadius, 0, Math.PI * 2); ctx.stroke()
-      ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = inside ? 28 : 16
-      ctx.beginPath(); ctx.arc(coreX, coreY, radius, 0, Math.PI * 2); ctx.stroke(); ctx.shadowBlur = 0
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(coreX, coreY, 8, 0, Math.PI * 2); ctx.fill()
+
+      const energy = inside ? 1 : inGrace ? 0.58 : 0.28
+      const pulse = (Math.sin(now / 150) + 1) / 2
+
+      const field = ctx.createRadialGradient(coreX, coreY, 0, coreX, coreY, radius * 4.6)
+      field.addColorStop(0, `rgba(216,255,47,${0.14 * energy})`)
+      field.addColorStop(.3, `rgba(216,255,47,${0.055 * energy})`)
+      field.addColorStop(.62, `rgba(110,90,207,${0.025 * (1 - energy)})`)
+      field.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = field
+      ctx.beginPath(); ctx.arc(coreX, coreY, radius * 4.6, 0, Math.PI * 2); ctx.fill()
+
+      for (let ring = 0; ring < 3; ring += 1) {
+        const waveRadius = radius * (1.45 + ring * .7 + ((now / 900 + ring * .28) % 1) * .45)
+        ctx.strokeStyle = `rgba(216,255,47,${Math.max(0, .16 - ring * .04) * energy})`
+        ctx.lineWidth = ring === 0 ? 1.4 : .8
+        ctx.beginPath(); ctx.arc(coreX, coreY, waveRadius, 0, Math.PI * 2); ctx.stroke()
+      }
+
+      trail.forEach((point, index) => {
+        point.life -= inside ? 0.032 : 0.05
+        const alpha = Math.max(0, point.life) * (inside ? .22 : .08)
+        ctx.fillStyle = inside ? `rgba(216,255,47,${alpha})` : `rgba(110,90,207,${alpha})`
+        ctx.beginPath(); ctx.arc(point.x, point.y, Math.max(1.5, radius * .48 - index * .72), 0, Math.PI * 2); ctx.fill()
+      })
+
+      ctx.save()
+      ctx.translate(coreX, coreY)
+      ctx.rotate(now / 1600)
+      ctx.setLineDash([5, 12])
+      ctx.strokeStyle = `rgba(216,255,47,${.3 * energy})`
+      ctx.lineWidth = 1
+      ctx.beginPath(); ctx.arc(0, 0, radius * 1.62, 0, Math.PI * 2); ctx.stroke()
+      ctx.rotate(-now / 720)
+      ctx.setLineDash([2, 9])
+      ctx.strokeStyle = `rgba(110,90,207,${.34 * (1 - energy) + .08})`
+      ctx.beginPath(); ctx.arc(0, 0, radius * 2.05, 0, Math.PI * 2); ctx.stroke()
+      ctx.restore()
+      ctx.setLineDash([])
+
+      ctx.strokeStyle = inside || inGrace ? LIME : PURPLE
+      ctx.lineWidth = inside ? 2.8 : 1.25
+      ctx.shadowColor = ctx.strokeStyle
+      ctx.shadowBlur = inside ? 30 : 13
+      ctx.beginPath(); ctx.arc(coreX, anchorY, captureRadius + pulse * 2.5, 0, Math.PI * 2); ctx.stroke()
+      ctx.shadowBlur = 0
+
+      const coreGradient = ctx.createRadialGradient(coreX - radius * .2, coreY - radius * .25, 1, coreX, coreY, radius * 1.25)
+      coreGradient.addColorStop(0, '#FFFFFF')
+      coreGradient.addColorStop(.14, inside ? '#F4FFC2' : '#D8D0FF')
+      coreGradient.addColorStop(.36, inside ? LIME : PURPLE)
+      coreGradient.addColorStop(.72, inside ? 'rgba(216,255,47,.18)' : 'rgba(110,90,207,.15)')
+      coreGradient.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = coreGradient
+      ctx.shadowColor = inside ? LIME : PURPLE
+      ctx.shadowBlur = inside ? 44 + pulse * 16 : 24
+      ctx.beginPath(); ctx.arc(coreX, coreY, radius * (1.03 + pulse * .04), 0, Math.PI * 2); ctx.fill()
+      ctx.shadowBlur = 0
+
+      ctx.fillStyle = '#fff'
+      ctx.beginPath(); ctx.arc(coreX, coreY, 5.5 + pulse * 1.5, 0, Math.PI * 2); ctx.fill()
 
       if (integrityValue <= 0) return finish(false, phase)
       if (startedAt && elapsed >= GAME_SECONDS * 1000) return finish(true)
@@ -185,9 +241,9 @@ export function SignalGame({ seed, onFinish }: { seed: number; onFinish: (result
     return () => { cancelAnimationFrame(raf); removeEventListener('resize', resize); document.removeEventListener('visibilitychange', visibility); canvas.removeEventListener('pointerdown', down); canvas.removeEventListener('pointermove', move); canvas.removeEventListener('pointerup', up); canvas.removeEventListener('pointercancel', up) }
   }, [onFinish, seed])
 
-  return <section className={`screen game-screen ${integrity <= 25 ? 'is-critical' : integrity <= 55 ? 'is-warning' : ''}`}>
+  return <section className={`screen game-screen ${locked ? 'is-locked' : ''} ${integrity <= 25 ? 'is-critical' : integrity <= 55 ? 'is-warning' : ''}`}>
     <div className="hud hud-premium"><div className="hud-cell"><span>ВРЕМЯ</span><strong>{timeLeft.toFixed(1)}</strong><small>СЕК</small></div><div className="hud-center" aria-hidden="true"><i className={locked ? 'is-locked' : ''} /></div><div className="hud-cell hud-cell-right"><span>ЦЕЛОСТНОСТЬ</span><strong>{Math.round(integrity)}</strong><small>%</small></div></div>
-    <div className="game-meta-row"><span>{patternFor(seed)}</span><strong className={combo ? 'combo-live' : ''}>{combo ? `x${combo}` : ''}</strong><em /></div>
+    <div className="game-meta-row"><span>{patternFor(seed)}</span><strong className={combo ? 'combo-live' : ''}>{combo ? `x${combo}` : ''}</strong><em>{locked ? 'РЕЗОНАНС' : started ? 'ПОИСК КОНТАКТА' : 'ОЖИДАНИЕ'}</em></div>
     <div className="canvas-wrap"><canvas ref={canvasRef} />{!started && <div className="touch-hint"><strong>ПОЙМАЙ СИГНАЛ</strong><span>Следуй за нижним кольцом</span></div>}{paused && <div className="touch-hint"><strong>ПАУЗА</strong><span>Вернись в игру и продолжай</span></div>}</div>
   </section>
 }
