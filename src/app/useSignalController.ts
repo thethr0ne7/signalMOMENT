@@ -55,14 +55,14 @@ export function useSignalController() {
 
   const start = useCallback(() => {
     telegramAdapter.haptic('tap')
-    setCountdown(3)
+    setCountdown(history.length > 0 ? 1 : 3)
     setScreen('countdown')
     gameStartedAtRef.current = Date.now()
     gameSessionRef.current = null
     void signalApi.startGameSession(chainId)
       .then((gameSession) => { gameSessionRef.current = gameSession })
       .catch((error) => console.warn('Server game session unavailable; result remains local.', error))
-  }, [chainId])
+  }, [chainId, history.length])
 
   useEffect(() => {
     if (screen !== 'countdown') return
@@ -70,9 +70,10 @@ export function useSignalController() {
       setScreen('game')
       return
     }
-    const id = window.setTimeout(() => setCountdown((value) => value - 1), 650)
+    const delay = history.length > 0 ? 420 : 650
+    const id = window.setTimeout(() => setCountdown((value) => value - 1), delay)
     return () => window.clearTimeout(id)
-  }, [screen, countdown])
+  }, [screen, countdown, history.length])
 
   const finish = useCallback((next: GameResult) => {
     setResult(next)
