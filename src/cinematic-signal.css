@@ -1,0 +1,228 @@
+/* Cinematic signal polish: a focused premium energy object, not decorative neon. */
+
+.signal-orb {
+  filter: drop-shadow(0 34px 42px rgba(0,0,0,.82));
+  transform-style: preserve-3d;
+}
+
+.signal-orb::before {
+  inset: -88%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,.08) 0 2%, transparent 3%),
+    repeating-radial-gradient(circle, transparent 0 30px, rgba(216,255,47,.026) 31px 32px, transparent 33px 49px),
+    radial-gradient(circle, rgba(216,255,47,.22), rgba(216,255,47,.055) 30%, rgba(110,90,207,.035) 48%, transparent 70%);
+  filter: saturate(1.15);
+  animation: cinematicField 3.4s cubic-bezier(.4,0,.2,1) infinite;
+}
+
+.signal-orb::after {
+  inset: -42%;
+  background:
+    conic-gradient(from 20deg,
+      transparent 0 8%, rgba(255,255,255,.36) 8.5%, rgba(216,255,47,.6) 9%, transparent 10% 31%,
+      rgba(216,255,47,.16) 32%, transparent 34% 58%,
+      rgba(110,90,207,.28) 59%, transparent 60% 82%,
+      rgba(216,255,47,.22) 83%, transparent 84% 100%);
+  -webkit-mask: radial-gradient(circle, transparent 0 45%, #000 46% 49%, transparent 50% 61%, #000 62% 64%, transparent 65%);
+  mask: radial-gradient(circle, transparent 0 45%, #000 46% 49%, transparent 50% 61%, #000 62% 64%, transparent 65%);
+  filter: drop-shadow(0 0 10px rgba(216,255,47,.28));
+  animation: cinematicOrbit 9s linear infinite;
+}
+
+.signal-orb > span {
+  width: 34%;
+  overflow: visible;
+  background:
+    radial-gradient(circle at 35% 30%, #fff 0 6%, #fffff2 8%, #f4ffc0 13%, #e5ff66 24%, #d8ff2f 38%, rgba(216,255,47,.82) 48%, rgba(216,255,47,.25) 66%, transparent 76%);
+  box-shadow:
+    0 0 8px rgba(255,255,255,1),
+    0 0 24px rgba(255,255,255,.82),
+    0 0 54px rgba(216,255,47,.95),
+    0 0 110px rgba(216,255,47,.48),
+    0 0 210px rgba(216,255,47,.18),
+    inset -12px -14px 24px rgba(72,88,0,.24),
+    inset 8px 8px 18px rgba(255,255,255,.34);
+  animation: cinematicCore 2.45s cubic-bezier(.45,0,.2,1) infinite;
+}
+
+.signal-orb > span::before {
+  inset: -48%;
+  border: 1px solid rgba(216,255,47,.42);
+  box-shadow: 0 0 22px rgba(216,255,47,.12), inset 0 0 18px rgba(216,255,47,.08);
+  animation: premiumPulse 2.8s cubic-bezier(.18,.75,.3,1) infinite;
+}
+
+.signal-orb > span::after {
+  inset: -86%;
+  border: 1px solid rgba(255,255,255,.16);
+  box-shadow: 0 0 35px rgba(216,255,47,.08);
+  animation: premiumPulse 2.8s 1.4s cubic-bezier(.18,.75,.3,1) infinite;
+}
+
+.signal-orb > span b {
+  inset: 40%;
+  background: #fff;
+  box-shadow:
+    0 0 8px #fff,
+    0 0 20px #fff,
+    0 0 36px var(--accent),
+    0 0 74px rgba(216,255,47,.7);
+  animation: nucleusBeat 1.18s ease-in-out infinite;
+}
+
+.orb-ring {
+  border-width: 1px;
+  mix-blend-mode: screen;
+}
+
+.ring-one {
+  inset: 9%;
+  border-style: solid;
+  border-color: transparent;
+  background: conic-gradient(from 0deg, transparent 0 12%, rgba(216,255,47,.95) 13% 16%, transparent 17% 49%, rgba(255,255,255,.52) 50% 51%, transparent 52% 100%) border-box;
+  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: cinematicOrbit 4.8s linear infinite;
+  filter: drop-shadow(0 0 7px rgba(216,255,47,.5));
+}
+
+.ring-two {
+  inset: -5%;
+  border-color: rgba(255,255,255,.09);
+  border-top-color: rgba(216,255,47,.8);
+  border-right-color: rgba(216,255,47,.18);
+  border-bottom-color: transparent;
+  animation: reverseSpin 8.5s linear infinite;
+  filter: drop-shadow(0 0 10px rgba(216,255,47,.22));
+}
+
+.ring-three {
+  inset: -27%;
+  border-color: rgba(110,90,207,.12);
+  border-left-color: rgba(110,90,207,.82);
+  border-top-color: rgba(216,255,47,.2);
+  transform: rotateX(67deg) rotateZ(14deg);
+  animation: anomalyOrbit 13s linear infinite;
+  filter: drop-shadow(0 0 8px rgba(110,90,207,.28));
+}
+
+.home-screen .signal-orb {
+  animation: cinematicFloat 5.8s ease-in-out infinite;
+}
+
+.countdown-shell {
+  filter: drop-shadow(0 0 36px rgba(216,255,47,.18));
+}
+
+.countdown-shell::before,
+.countdown-shell::after {
+  border-color: rgba(216,255,47,.28);
+  box-shadow: 0 0 26px rgba(216,255,47,.1);
+}
+
+.countdown-radar {
+  background:
+    conic-gradient(from 0deg, transparent 0 72%, rgba(216,255,47,.2) 82%, transparent 92%),
+    repeating-radial-gradient(circle, transparent 0 22px, rgba(216,255,47,.075) 23px 24px);
+  animation: cinematicOrbit 7s linear infinite;
+}
+
+.game-screen.is-locked .canvas-wrap {
+  filter: saturate(1.18) contrast(1.04);
+}
+
+.game-screen.is-locked .canvas-wrap::after {
+  content:"";
+  position:absolute;
+  inset:10% -20% 4%;
+  pointer-events:none;
+  background:
+    radial-gradient(ellipse at 50% 54%, rgba(255,255,255,.055), transparent 16%),
+    radial-gradient(ellipse at 50% 54%, rgba(216,255,47,.12), transparent 45%);
+  mix-blend-mode:screen;
+  animation: resonanceBloom 1.7s ease-in-out infinite;
+}
+
+.result-core {
+  filter: drop-shadow(0 25px 40px rgba(0,0,0,.72));
+}
+
+.accuracy-ring {
+  background:
+    radial-gradient(circle at 50% 50%, transparent 58%, rgba(255,255,255,.08) 59% 60%, transparent 61%),
+    conic-gradient(from -90deg, #f5ffc4 0, var(--accent) calc(var(--p) * .72), #9fc20e var(--p), rgba(255,255,255,.055) 0);
+  box-shadow:
+    0 0 14px rgba(255,255,255,.12),
+    0 0 54px rgba(216,255,47,.28),
+    0 0 110px rgba(216,255,47,.09);
+}
+
+.accuracy-ring > div {
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255,255,255,.08), transparent 18%),
+    radial-gradient(circle at 50% 44%, #181b0e 0, #090a06 48%, #020202 74%);
+  box-shadow: inset 0 0 30px rgba(216,255,47,.06);
+}
+
+.result-orbit {
+  filter: drop-shadow(0 0 8px rgba(216,255,47,.2));
+}
+
+@keyframes cinematicCore {
+  0%,100% { transform: scale(.96); filter: brightness(.92) saturate(1.05); }
+  38% { transform: scale(1.045); filter: brightness(1.16) saturate(1.18); }
+  52% { transform: scale(1.015); }
+  70% { transform: scale(1.06); filter: brightness(1.08); }
+}
+
+@keyframes nucleusBeat {
+  0%,100% { transform: scale(.82); opacity:.82; }
+  45% { transform: scale(1.34); opacity:1; }
+  55% { transform: scale(1.02); }
+}
+
+@keyframes premiumPulse {
+  0% { transform:scale(.52); opacity:0; }
+  18% { opacity:.62; }
+  100% { transform:scale(1.72); opacity:0; }
+}
+
+@keyframes cinematicField {
+  0%,100% { transform:scale(.94); opacity:.72; }
+  50% { transform:scale(1.08); opacity:1; }
+}
+
+@keyframes cinematicOrbit { to { transform:rotate(360deg); } }
+
+@keyframes anomalyOrbit {
+  from { transform:rotateX(67deg) rotateZ(14deg); }
+  to { transform:rotateX(67deg) rotateZ(374deg); }
+}
+
+@keyframes cinematicFloat {
+  0%,100% { transform:translateY(4px) rotateZ(-.4deg); }
+  48% { transform:translateY(-10px) rotateZ(.6deg); }
+}
+
+@keyframes resonanceBloom {
+  0%,100% { opacity:.56; transform:scale(.96); }
+  50% { opacity:1; transform:scale(1.05); }
+}
+
+@media (max-height:740px) {
+  .signal-orb { width:min(44vw,190px); }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .signal-orb,
+  .signal-orb::before,
+  .signal-orb::after,
+  .signal-orb > span,
+  .signal-orb > span::before,
+  .signal-orb > span::after,
+  .signal-orb > span b,
+  .orb-ring,
+  .countdown-radar,
+  .game-screen.is-locked .canvas-wrap::after { animation:none !important; }
+}
