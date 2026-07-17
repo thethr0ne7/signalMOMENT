@@ -59,6 +59,42 @@ type AuthSession = {
   expires_at?: number
 }
 
+type RawMember = {
+  user_id: string
+  inviter_user_id: string | null
+  depth: number
+  best_result: number | null
+  joined_at: string
+}
+
+type RawResult = {
+  user_id: string
+  score: number
+  accuracy: number
+  success: boolean
+  created_at: string
+}
+
+type RawChain = {
+  id: string
+  status: ChainSnapshot['status']
+  participant_count: number
+  best_result: number
+  max_depth: number
+  expires_at: string
+  chain_members?: RawMember[]
+  results?: RawResult[]
+}
+
+type RawEvent = {
+  id: number
+  event_type: string
+  chain_id: string | null
+  actor_user_id: string | null
+  created_at: string
+  payload?: Record<string, unknown>
+}
+
 export interface SignalApi {
   authenticate(initData: string): Promise<boolean>
   resolveChain(startParam: string): Promise<ChainContext>
@@ -72,8 +108,10 @@ const apiUrl = import.meta.env.VITE_SIGNAL_API_URL || ''
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 const SESSION_KEY = 'signalmoment_session'
+const USER_KEY = 'signalmoment_user_id'
 
 let session: AuthSession | null = loadSession()
+let currentUserId = localStorage.getItem(USER_KEY) || ''
 
 function loadSession(): AuthSession | null {
   try {
@@ -93,6 +131,46 @@ function inviterToken(startParam: string) {
 
 function hasServerSession() {
   return Boolean(apiUrl && session?.access_token)
+}
+
+function participantName(userId: string, index: number) {
+  if (userId === currentUserId) return 'Ты'
+  return `Участник ${String(index + 1).padStart(2, '0')}`
+}
+
+function normalizeChain(raw: RawChain): ChainSnapshot {
+  const members = raw.chain_members || []
+  const currentMember = members.find((member) => member.user_id === currentUserId)
+  const inviterId = currentMember?.inviter_user_id || null
+  const participants = members.map((member, index) => ({
+    userId: member.user_id,
+    firstName: participantName(member.user_id, index),
+    username: null,
+    depth: member.depth,
+    bestResult: member.best_result == null ? null : Number(member.best_result),
+    joinedAt: member.joined_at,
+    isCurrentUser: member.user_id === currentUserId,
+    isInviter: member.user_id === inviterId,
+  }))
+
+  return {
+    id: raw.id,
+    status: raw.status,
+    participantCount: raw.participant_count,
+    bestResult: Number(raw.best_result),
+    maxDepth: raw.max_depth,
+    expiresAt: raw.expires_at,
+    inviter: participants.find((participant) => participant.isInviter) || null,
+    participants,
+    results: (raw.results || []).map((result) => ({
+      userId: result.user_id,
+      firstName: participants.find((participant) => participant.userId === result.user_id)?.firstName || 'Участник',
+      score: Number(result.score),
+      accuracy: Number(result.accuracy),
+      success: result.success,
+      createdAt: result.created_at,
+    })),
+  }
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -121,11 +199,13 @@ async function exchangeToken(tokenHash: string) {
 export const signalApi: SignalApi = {
   async authenticate(initData) {
     if (!apiUrl || !supabaseUrl || !supabaseAnonKey || !initData) return false
-    if (session?.access_token && (!session.expires_at || session.expires_at * 1000 > Date.now() + 30_000)) return true
-    const auth = await request<{ token_hash: string }>('/auth/telegram', {
+    if (session?.access_token && currentUserId && (!session.expires_at || session.expires_at * 1000 > Date.now() + 30_000)) return true
+    const auth = await request<{ token_hash: string; user: { id: string } }>('/auth/telegram', {
       method: 'POST',
       body: JSON.stringify({ initData }),
     })
+    currentUserId = auth.user.id
+    localStorage.setItem(USER_KEY, currentUserId)
     await exchangeToken(auth.token_hash)
     return true
   },
@@ -146,14 +226,21 @@ export const signalApi: SignalApi = {
 
   async getChain(chainId) {
     if (!hasServerSession()) return null
-    const { chain } = await request<{ chain: ChainSnapshot }>(`/chains/${chainId}`)
-    return chain
+    const { chain } = await request<{ chain: RawChain }>(`/chains/${chainId}`)
+    return normalizeChain(chain)
   },
 
   async getActivity() {
     if (!hasServerSession()) return []
-    const { events } = await request<{ events: ActivityEvent[] }>('/users/me/activity')
-    return events
+    const { events } = await request<{ events: RawEvent[] }>('/users/me/activity')
+    return events.map((event) => ({
+      id: event.id,
+      eventType: event.event_type,
+      chainId: event.chain_id,
+      actorName: event.actor_user_id === currentUserId ? 'Ты' : 'Участник цепи',
+      createdAt: event.created_at,
+      payload: event.payload || {},
+    }))
   },
 
   async startGameSession(chainId) {
