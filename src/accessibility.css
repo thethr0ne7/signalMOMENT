@@ -1,0 +1,33 @@
+/* Interaction accessibility is applied after feature styles. */
+:where(button, [role="button"], a, input, select, textarea):focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(85,246,255,.16);
+}
+
+:where(button, [role="button"], a)[aria-disabled="true"],
+:where(button, input, select, textarea):disabled {
+  cursor: not-allowed;
+  opacity: .52;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+
+  .ambient,
+  .noise,
+  .grid {
+    animation: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :where(button, [role="button"], a):focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
